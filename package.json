@@ -1,0 +1,17 @@
+{
+  "name": "central-assessment-portal",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev:backend": "npm --prefix backend run start:dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:backend": "npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "prisma:generate": "npm --prefix backend run prisma:generate",
+    "prisma:migrate": "npm --prefix backend run prisma:migrate",
+    "seed": "npm --prefix backend run seed"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

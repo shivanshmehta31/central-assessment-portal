@@ -1,0 +1,658 @@
+// Central Assessment & Examination Portal — Data Model
+// PostgreSQL + Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ────────────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  FACULTY
+  STUDENT
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum QuestionType {
+  MCQ
+  MULTIPLE_SELECT
+  TRUE_FALSE
+  SHORT_ANSWER
+  DESCRIPTIVE
+  CODING
+  CODE_COMPLETION
+  CODE_DEBUGGING
+  CODE_OUTPUT_PREDICTION
+  DATASET_ANALYSIS
+  VISUALIZATION_INTERPRETATION
+}
+
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum AssessmentType {
+  QUIZ
+  INTERNAL_ASSESSMENT
+  PRACTICAL_ASSESSMENT
+  MID_TERM
+  FINAL_EXAM
+  MOCK_TEST
+  PRACTICE_TEST
+}
+
+enum AssessmentStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum DeviceRestriction {
+  DESKTOP_ONLY
+  DESKTOP_AND_TABLET
+  ALL_DEVICES
+}
+
+enum ViolationPolicyAction {
+  LOG_ONLY
+  WARN
+  AUTO_SUBMIT
+  TERMINATE
+}
+
+enum AttemptStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  PAUSED
+  SUBMITTED
+  AUTO_SUBMITTED
+  TERMINATED
+  EXPIRED
+  EVALUATION_PENDING
+  EVALUATED
+}
+
+enum SubmissionReason {
+  TIME_EXPIRED
+  VIOLATION_LIMIT_REACHED
+  STUDENT_SUBMITTED
+  ADMIN_TERMINATED
+  ADMIN_ENDED
+}
+
+enum ViolationType {
+  TAB_SWITCH
+  WINDOW_BLUR
+  FULLSCREEN_EXIT
+  PAGE_REFRESH
+  NAVIGATION_ATTEMPT
+  COPY_PASTE
+  DEVTOOLS_OPENED
+  MULTIPLE_FACES
+  OTHER
+}
+
+enum ViolationSeverityAction {
+  WARNED
+  IGNORED
+  AUTO_SUBMITTED
+  TERMINATED
+}
+
+enum ResultStatus {
+  PENDING_EVALUATION
+  EVALUATED
+  PUBLISHED
+  WITHHELD
+}
+
+enum NotificationAudience {
+  STUDENT
+  FACULTY
+  ADMIN
+}
+
+enum NotificationType {
+  ASSESSMENT_AVAILABLE
+  ASSESSMENT_REMINDER
+  ASSESSMENT_STARTED
+  TIME_REMINDER
+  RESULT_PUBLISHED
+  EVALUATION_ASSIGNED
+  EVALUATION_PENDING
+  SUSPICIOUS_ACTIVITY
+  SYSTEM_ERROR
+  ASSESSMENT_COMPLETED
+  GENERAL
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// IDENTITY & ORGANIZATION
+// ────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  passwordHash  String
+  role          UserRole
+  status        AccountStatus @default(ACTIVE)
+  mustResetPassword Boolean   @default(false)
+  passwordResetTokenHash String?
+  passwordResetExpiresAt DateTime?
+  lastLoginAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  admin    Admin?
+  faculty  Faculty?
+  student  Student?
+
+  auditLogs     AuditLog[]
+  notifications Notification[]
+  refreshTokens RefreshToken[]
+
+  @@index([role])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Admin {
+  id       String @id @default(cuid())
+  userId   String @unique
+  name     String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  code      String   @unique
+  createdAt DateTime @default(now())
+
+  courses  Course[]
+  faculty  Faculty[]
+  students Student[]
+}
+
+model Course {
+  id           String   @id @default(cuid())
+  name         String
+  code         String   @unique
+  departmentId String
+  createdAt    DateTime @default(now())
+
+  department Department @relation(fields: [departmentId], references: [id])
+  subjects   Subject[]
+
+  @@index([departmentId])
+}
+
+model Subject {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  courseId  String
+  syllabusUnits Json? // structured syllabus units/topics/subtopics
+  createdAt DateTime @default(now())
+
+  course        Course         @relation(fields: [courseId], references: [id])
+  questions     Question[]
+  assessments   Assessment[]
+  facultySubjects FacultySubject[]
+
+  @@index([courseId])
+}
+
+model Faculty {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  facultyCode    String   @unique
+  name           String
+  phone          String?
+  departmentId   String
+  designation    String?
+  createdAt      DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id])
+
+  facultySubjects   FacultySubject[]
+  assignedAssessments AssessmentEvaluator[]
+  createdQuestions  Question[] @relation("QuestionCreatedBy")
+  scoreOverrides    EvaluationResult[]
+
+  @@index([departmentId])
+}
+
+model FacultySubject {
+  id        String @id @default(cuid())
+  facultyId String
+  subjectId String
+
+  faculty Faculty @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([facultyId, subjectId])
+}
+
+model Student {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  studentCode      String   @unique // Student ID
+  enrollmentNumber String   @unique
+  name             String
+  phone            String?
+  departmentId     String
+  branch           String?
+  semester         Int?
+  section          String?
+  batch            String?
+  academicYear     String?
+  createdAt        DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id])
+
+  assignments AssessmentAssignment[]
+  attempts    AttemptRecord[]
+  violations  Violation[]
+
+  @@index([departmentId])
+  @@index([semester, section, batch])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// QUESTION BANK
+// ────────────────────────────────────────────────────────────────────────────
+
+model Question {
+  id              String          @id @default(cuid())
+  title           String
+  description     String // question body, supports markdown/code blocks
+  type            QuestionType
+  difficulty      DifficultyLevel @default(MEDIUM)
+  subjectId       String
+  topic           String
+  subtopic        String?
+  marks           Float           @default(1)
+  negativeMarks   Float           @default(0)
+  tags            String[]        @default([])
+  explanation     String?
+  imageUrl        String?
+  isActive        Boolean         @default(true)
+
+  // MCQ / Multi-select / True-False
+  options         QuestionOption[]
+
+  // Short answer
+  shortAnswerKey  String?
+  characterLimit  Int?
+
+  // Descriptive
+  wordLimit       Int?
+
+  // Coding / Completion / Debugging / Output prediction
+  starterCode     String?
+  language        String?         @default("python")
+  incorrectCode   String?         // for debugging questions
+  expectedOutput  String?         // for output prediction
+  constraints     String?
+  sampleInput     String?
+  sampleOutput    String?
+  testCases       TestCase[]
+
+  // Dataset-based
+  datasetId       String?
+  dataset         Dataset?        @relation(fields: [datasetId], references: [id])
+  allowedLibraries String[]       @default([])
+  allowDatasetDownload Boolean    @default(false)
+
+  createdById     String?
+  createdBy       Faculty?        @relation("QuestionCreatedBy", fields: [createdById], references: [id])
+  subject         Subject         @relation(fields: [subjectId], references: [id])
+
+  assessmentQuestions AssessmentQuestion[]
+  studentAnswers      StudentAnswer[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([subjectId, type])
+  @@index([topic])
+}
+
+model QuestionOption {
+  id         String  @id @default(cuid())
+  questionId String
+  text       String
+  isCorrect  Boolean @default(false)
+  order      Int     @default(0)
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+}
+
+model TestCase {
+  id             String  @id @default(cuid())
+  questionId     String
+  input          String
+  expectedOutput String
+  isHidden       Boolean @default(false)
+  weight         Float   @default(1)
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+}
+
+model Dataset {
+  id          String   @id @default(cuid())
+  name        String
+  fileUrl     String
+  format      String // csv | xlsx | json
+  previewJson Json?
+  rowCount    Int?
+  columnCount Int?
+  uploadedAt  DateTime @default(now())
+
+  questions Question[]
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// ASSESSMENTS
+// ────────────────────────────────────────────────────────────────────────────
+
+model Assessment {
+  id            String           @id @default(cuid())
+  title         String
+  description   String?
+  subjectId     String
+  type          AssessmentType
+  status        AssessmentStatus @default(DRAFT)
+
+  totalMarks    Float
+  passingMarks  Float
+  durationMinutes Int
+
+  startAt       DateTime
+  endAt         DateTime
+
+  maxAttempts   Int              @default(1)
+  allowResume   Boolean          @default(true)
+
+  randomizeQuestionOrder Boolean @default(false)
+  randomizeOptionOrder   Boolean @default(false)
+  questionsPerAttempt    Int?    // if set, draw a random subset from the pool
+
+  deviceRestriction DeviceRestriction @default(DESKTOP_AND_TABLET)
+  requireFullscreen Boolean @default(true)
+
+  violationLimit    Int                    @default(3)
+  violationAction   ViolationPolicyAction  @default(AUTO_SUBMIT)
+
+  showResultsImmediately Boolean @default(false)
+  showCorrectAnswers     Boolean @default(false)
+
+  semester    String?
+  batch       String?
+
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subject     Subject                @relation(fields: [subjectId], references: [id])
+  questions   AssessmentQuestion[]
+  assignments AssessmentAssignment[]
+  evaluators  AssessmentEvaluator[]
+  attempts    AttemptRecord[]
+
+  @@index([status])
+  @@index([subjectId])
+  @@index([startAt, endAt])
+}
+
+model AssessmentQuestion {
+  id           String @id @default(cuid())
+  assessmentId String
+  questionId   String
+  order        Int    @default(0)
+  marksOverride Float?
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  question   Question   @relation(fields: [questionId], references: [id])
+
+  @@unique([assessmentId, questionId])
+  @@index([assessmentId])
+}
+
+model AssessmentAssignment {
+  id           String   @id @default(cuid())
+  assessmentId String
+  studentId    String
+  assignedAt   DateTime @default(now())
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, studentId])
+  @@index([studentId])
+}
+
+model AssessmentEvaluator {
+  id           String @id @default(cuid())
+  assessmentId String
+  facultyId    String
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  faculty    Faculty    @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, facultyId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// ATTEMPTS / ANSWERS / EVALUATION
+// ────────────────────────────────────────────────────────────────────────────
+
+model AttemptRecord {
+  id            String        @id @default(cuid())
+  assessmentId  String
+  studentId     String
+  attemptNumber Int           @default(1)
+  status        AttemptStatus @default(NOT_STARTED)
+
+  // server-authoritative timing
+  startedAt     DateTime?
+  deadlineAt    DateTime?     // startedAt + duration + extensions
+  extraTimeSeconds Int        @default(0)
+  submittedAt   DateTime?
+  submissionReason SubmissionReason?
+
+  // question set actually served to this student (order + subset), for randomization
+  questionOrder String[]      @default([])
+
+  violationCount Int          @default(0)
+  currentQuestionIndex Int    @default(0)
+
+  autoScore     Float?
+  manualScore   Float?
+  finalScore    Float?
+  resultStatus  ResultStatus  @default(PENDING_EVALUATION)
+
+  lastActivityAt DateTime?
+
+  assessment Assessment      @relation(fields: [assessmentId], references: [id])
+  student    Student         @relation(fields: [studentId], references: [id])
+  answers    StudentAnswer[]
+  violations Violation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([assessmentId, studentId, attemptNumber])
+  @@index([assessmentId, status])
+  @@index([studentId])
+}
+
+model StudentAnswer {
+  id         String   @id @default(cuid())
+  attemptId  String
+  questionId String
+
+  // generic answer payload — shape depends on question type
+  selectedOptionIds String[] @default([])
+  textAnswer        String?
+  codeAnswer        String?
+  codeLanguage      String?  @default("python")
+
+  isMarkedForReview Boolean  @default(false)
+  isAnswered        Boolean  @default(false)
+  timeSpentSeconds  Int      @default(0)
+
+  // evaluation
+  isAutoEvaluated Boolean  @default(false)
+  autoScore       Float?
+  autoCorrect     Boolean?
+  manualScore     Float?
+  facultyFeedback String?
+  evaluatedById   String?
+  evaluatedAt     DateTime?
+
+  codeExecutionResult Json? // stdout/stderr/test case results snapshot
+
+  attempt  AttemptRecord @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question Question      @relation(fields: [questionId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@index([questionId])
+}
+
+model EvaluationResult {
+  id           String   @id @default(cuid())
+  answerId     String
+  facultyId    String
+  scoreAwarded Float
+  feedback     String?
+  createdAt    DateTime @default(now())
+
+  faculty Faculty @relation(fields: [facultyId], references: [id])
+
+  @@index([answerId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// INTEGRITY MONITORING
+// ────────────────────────────────────────────────────────────────────────────
+
+model Violation {
+  id           String                   @id @default(cuid())
+  attemptId    String
+  studentId    String
+  type         ViolationType
+  timestamp    DateTime                 @default(now())
+  questionIndexAtTime Int?
+  remainingTimeSeconds Int?
+  actionTaken  ViolationSeverityAction  @default(WARNED)
+  metadata     Json?
+
+  overridden     Boolean  @default(false)
+  overriddenById String?
+  overriddenAt   DateTime?
+  overrideNote   String?
+
+  attempt AttemptRecord @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  student Student       @relation(fields: [studentId], references: [id])
+
+  @@index([attemptId])
+  @@index([studentId])
+  @@index([type])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// AUDIT / NOTIFICATIONS / SETTINGS
+// ────────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  role         UserRole?
+  action       String
+  entityType   String?
+  entityId     String?
+  metadata     Json?
+  ipAddress    String?
+  userAgent    String?
+  timestamp    DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([timestamp])
+}
+
+model Notification {
+  id        String               @id @default(cuid())
+  userId    String
+  audience  NotificationAudience
+  type      NotificationType
+  title     String
+  body      String
+  isRead    Boolean              @default(false)
+  metadata  Json?
+  createdAt DateTime             @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
+
+model SystemSetting {
+  id                       String   @id @default("singleton")
+  institutionName          String   @default("Central Assessment & Examination Portal")
+  institutionLogoUrl       String?
+  academicYear             String   @default("2026-2027")
+  defaultExamDurationMinutes Int    @default(60)
+  defaultViolationLimit     Int     @default(3)
+  defaultViolationAction    ViolationPolicyAction @default(AUTO_SUBMIT)
+  passwordMinLength         Int     @default(8)
+  sessionDurationMinutes    Int     @default(60)
+  supportedFileTypes        String[] @default(["csv", "xlsx", "json", "pdf", "png", "jpg"])
+  updatedAt                 DateTime @updatedAt
+}
