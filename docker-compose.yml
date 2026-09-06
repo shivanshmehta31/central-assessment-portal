@@ -41,7 +41,6 @@ services:
       - "4000:4000"
     volumes:
       - backend_uploads:/app/uploads
-    command: sh -c "npx prisma migrate deploy && node dist/src/main.js"
 
   frontend:
     build:
