@@ -16,6 +16,7 @@ interface Assessment {
   title: string;
   type: string;
   status: string;
+  mode: string;
   startAt: string;
   endAt: string;
   totalMarks: number;
@@ -81,7 +82,7 @@ export default function AssessmentsPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <p className="font-medium">{a.title}</p>
-                  <Badge tone={statusTone[a.status]}>{a.status}</Badge>
+                  {a.mode === 'OFFLINE' ? <Badge tone="primary">PAPER-BASED</Badge> : <Badge tone={statusTone[a.status]}>{a.status}</Badge>}
                 </div>
                 <p className="mt-1 text-sm text-muted">
                   {a.subject?.name} · {a._count.questions} questions · {a._count.assignments} students assigned ·{' '}

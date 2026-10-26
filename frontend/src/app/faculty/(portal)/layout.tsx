@@ -1,12 +1,13 @@
 'use client';
 
-import { LayoutDashboard, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, ClipboardCheck, FileText } from 'lucide-react';
 import { PortalShell } from '@/components/layout/portal-shell';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { LoadingBlock } from '@/components/ui/primitives';
 
 const navItems = [
   { label: 'Dashboard', href: '/faculty/dashboard', icon: <LayoutDashboard size={18} /> },
+  { label: 'Question Papers', href: '/faculty/question-papers', icon: <FileText size={18} /> },
   { label: 'Evaluate Submissions', href: '/faculty/evaluate', icon: <ClipboardCheck size={18} /> },
 ];
 

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/auth-store';
 import { Badge, Card, EmptyState, ErrorBanner, LoadingBlock } from '@/components/ui/primitives';
+import type { PaperSummary } from '@/lib/papers';
 
 interface AssessmentSummary {
   id: string;
@@ -21,10 +22,12 @@ interface AssessmentSummary {
 export default function FacultyDashboardPage() {
   const user = useAuthStore((s) => s.user);
   const [items, setItems] = useState<AssessmentSummary[]>([]);
+  const [papers, setPapers] = useState<PaperSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    api.get<PaperSummary[]>('/question-papers').then(setPapers).catch(() => {});
     api
       .get<AssessmentSummary[]>('/evaluation/assessments')
       .then(setItems)
@@ -64,6 +67,35 @@ export default function FacultyDashboardPage() {
             </Link>
           ))}
         </div>
+      </Card>
+
+      <Card>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Paper-based question papers</h2>
+          <Link href="/faculty/question-papers" className="text-xs text-[var(--accent)] hover:underline">
+            Manage all
+          </Link>
+        </div>
+        {papers.length === 0 ? (
+          <EmptyState title="No question papers yet" description="Upload a paper and its answer sheets from Question Papers." />
+        ) : (
+          <div className="space-y-2">
+            {papers.slice(0, 5).map((p) => (
+              <Link
+                key={p.id}
+                href={`/faculty/question-papers/${p.id}`}
+                className="flex items-center justify-between rounded-lg border border-[var(--border)] p-3 text-sm hover:bg-slate-50"
+              >
+                <span>
+                  {p.title} <span className="text-xs text-muted">· {p.subject.name}</span>
+                </span>
+                <Badge tone={p.pendingCount > 0 ? 'warning' : 'neutral'}>
+                  {p.pendingCount > 0 ? `${p.pendingCount} to evaluate` : `${p.sheetCount} sheets`}
+                </Badge>
+              </Link>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );

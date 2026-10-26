@@ -46,6 +46,11 @@ Three portals, one backend:
 - Full audit log of logins, exam starts/submissions, violations, admin overrides, and evaluation
   actions.
 - CSV/Excel bulk import for students; CSV import for MCQ-style questions.
+- **Paper-based assessments (Faculty → Question Papers):** faculty create a question paper by
+  uploading an Excel/CSV/PDF and/or adding questions manually, then upload students' scanned answer
+  sheets (PDF/PNG/JPG — one at a time, or up to 25 at once named after the Student ID) and evaluate
+  them in a split-screen view (sheet on the left, per-question marks + feedback on the right).
+  Results flow through the same evaluation → admin publish → student result pipeline as online exams.
 
 ## 3. Technology Stack
 
@@ -76,6 +81,9 @@ backend/
     students/ faculty/       CRUD, bulk import, credential management
     question-bank/           Question CRUD, CSV import, dataset upload
     assessments/             Assessment builder, exam control (start/pause/end/extend/terminate)
+    question-papers/         Paper-based flow: question papers, Excel/CSV/PDF import (parse →
+                             review → commit), answer-sheet upload + evaluation
+    files/                   Document storage (Postgres) + access-controlled file download
     attempts/                The exam-taking engine: start, save-answer, submit, auto-grading,
                              server-authoritative deadline enforcement (cron)
     violations/              Integrity violation reporting + admin incident management
@@ -179,6 +187,29 @@ npm run test:e2e       # full golden-path integration test against a real Postgr
 `test:e2e` needs `DATABASE_URL` pointing at a real, seeded Postgres database (it reads one seeded
 student, `CSE2026005`, and does not touch the rest of the seed data).
 
+### Paper-based question papers & answer sheets
+
+Faculty portal → **Question Papers**. A paper is stored as an assessment with `mode = OFFLINE`, so
+results, analytics, publishing and the student result page all reuse the online-exam machinery.
+
+- **Question paper import** — Excel (`.xlsx`) or CSV: one question per row (download the template
+  from the page). PDF: numbered questions (`1.`, `Q2)`), options (`A.`/`(a)`), `Answer: B` lines and
+  `[5 marks]` tags are detected automatically. Nothing is saved until the faculty member has reviewed
+  and edited the parsed questions. Scanned (image-only) PDFs have no text to read — they are kept as the
+  reference document and the questions are added manually (no OCR).
+- **Manual entry** — the same question form as the admin question bank (all 11 types). Choice questions
+  must have at least two options and a correct answer; this is enforced on the server.
+- **Answer sheets** — PDF/PNG/JPG, 10 MB each. Bulk upload matches files to students by file name
+  (`CSE2026001.pdf`, or `CSE2026001_Aarav.pdf`). Marks are entered per question (never above the
+  question's maximum); drafts can be saved, and *Finalize* requires every question to be scored.
+  Published results are locked for faculty (admins can still override a score).
+- **Access** — faculty only see papers they own/evaluate; uploaded files are served only to the staff
+  who can access the parent paper, as an inline, sandboxed response. File types are verified from the
+  file's bytes, not its extension or declared type.
+- **Storage** — uploads are kept in Postgres (`StoredFile`), so they survive hosts with ephemeral disks.
+  On Neon's free tier (0.5 GB) that is roughly a few hundred typical scans; move to object storage
+  before scaling to thousands of sheets.
+
 ## 10. Building for Production
 
 ```bash
@@ -244,6 +275,8 @@ sandboxed code execution for coding questions was intentionally deferred. Concre
 - **Notifications** are recorded in the database and readable via `/notifications`, but there is no
   email/push delivery channel yet (`forgot-password` similarly logs a reset link server-side instead
   of emailing it — wire in a transactional email provider before production use).
+- Answer sheets are evaluated manually; there is no OCR or AI marking of handwritten answers. Legacy
+  `.xls` files are not supported (save as `.xlsx` or CSV).
 - Bulk report exports (attendance, faculty evaluation summary) beyond the results CSV are not yet
   built.
 

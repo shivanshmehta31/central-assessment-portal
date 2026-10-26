@@ -25,15 +25,16 @@ export class AnalyticsService {
       this.prisma.student.count({ where: { user: { status: 'ACTIVE' } } }),
       this.prisma.faculty.count(),
       this.prisma.assessment.count(),
-      this.prisma.assessment.count({ where: { startAt: { gt: now }, status: { in: ['DRAFT', 'SCHEDULED'] } } }),
+      this.prisma.assessment.count({ where: { mode: 'ONLINE', startAt: { gt: now }, status: { in: ['DRAFT', 'SCHEDULED'] } } }),
       this.prisma.assessment.count({
         where: {
+          mode: 'ONLINE',
           startAt: { lte: now },
           endAt: { gte: now },
           status: { in: ['ACTIVE', 'SCHEDULED'] },
         },
       }),
-      this.prisma.assessment.count({ where: { OR: [{ status: 'COMPLETED' }, { status: { in: ['ACTIVE', 'SCHEDULED'] }, endAt: { lt: now } }] } }),
+      this.prisma.assessment.count({ where: { mode: 'ONLINE', OR: [{ status: 'COMPLETED' }, { status: { in: ['ACTIVE', 'SCHEDULED'] }, endAt: { lt: now } }] } }),
       this.prisma.attemptRecord.count({ where: { status: 'IN_PROGRESS' } }),
       this.prisma.attemptRecord.count({ where: { status: { in: ['SUBMITTED', 'AUTO_SUBMITTED', 'EVALUATED'] } } }),
       this.prisma.attemptRecord.count({ where: { violationCount: { gt: 0 } } }),

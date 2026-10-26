@@ -42,10 +42,11 @@ async function refreshAccessToken(): Promise<string | null> {
 interface RequestOptions extends RequestInit {
   auth?: boolean;
   isFormData?: boolean;
+  responseType?: 'blob';
 }
 
 export async function apiFetch<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { auth = true, isFormData, headers, ...rest } = options;
+  const { auth = true, isFormData, responseType, headers, ...rest } = options;
   const doFetch = async (token: string | null) => {
     const finalHeaders: Record<string, string> = {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
@@ -76,6 +77,7 @@ export async function apiFetch<T = unknown>(path: string, options: RequestOption
   }
 
   if (res.status === 204) return undefined as T;
+  if (responseType === 'blob') return (await res.blob()) as unknown as T;
   const contentType = res.headers.get('content-type') ?? '';
   if (contentType.includes('application/json')) return res.json();
   return res.text() as unknown as T;
@@ -88,6 +90,13 @@ export const api = {
   patch: <T = unknown>(path: string, body?: unknown) =>
     apiFetch<T>(path, { method: 'PATCH', body: body != null ? JSON.stringify(body) : undefined }),
   delete: <T = unknown>(path: string) => apiFetch<T>(path, { method: 'DELETE' }),
+  // Authenticated binary download (e.g. an uploaded PDF) — returned as a Blob.
+  blob: (path: string) => apiFetch<Blob>(path, { method: 'GET', responseType: 'blob' }),
+  // Multipart upload with several fields/files.
+  form: <T = unknown>(path: string, body: FormData, method = 'POST') =>
+    apiFetch<T>(path, { method, isFormData: true, body }),
+  put: <T = unknown>(path: string, body?: unknown) =>
+    apiFetch<T>(path, { method: 'PUT', body: body != null ? JSON.stringify(body) : undefined }),
   upload: <T = unknown>(path: string, file: File, fieldName = 'file', query = '') =>
     apiFetch<T>(`${path}${query}`, {
       method: 'POST',
@@ -101,3 +110,13 @@ export const api = {
 };
 
 export { API_URL };
+
+// Saves a Blob as a file download in the browser.
+export function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}

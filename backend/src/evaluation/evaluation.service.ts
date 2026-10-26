@@ -25,7 +25,7 @@ export class EvaluationService {
 
   async myAssessments(facultyId: string) {
     const assessments = await this.prisma.assessment.findMany({
-      where: { evaluators: { some: { facultyId } } },
+      where: { mode: 'ONLINE', evaluators: { some: { facultyId } } },
       include: {
         subject: true,
         attempts: { select: { id: true, resultStatus: true, autoScore: true, finalScore: true, status: true } },

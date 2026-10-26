@@ -3,16 +3,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, Upload } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { Badge, Button, Card, EmptyState, ErrorBanner, Input, Label, LoadingBlock, Modal, Select, Textarea } from '@/components/ui/primitives';
+import { Badge, Button, Card, EmptyState, ErrorBanner, Label, LoadingBlock, Modal, Select } from '@/components/ui/primitives';
 import { QUESTION_TYPE_LABELS, type QuestionType } from '@/lib/types';
+import { QuestionFormModal } from '@/components/questions/question-form-modal';
 
 interface Subject {
   id: string;
   name: string;
-}
-interface Option {
-  text: string;
-  isCorrect: boolean;
 }
 interface Question {
   id: string;
@@ -24,9 +21,6 @@ interface Question {
   subject: Subject;
 }
 
-const QUESTION_TYPES = Object.keys(QUESTION_TYPE_LABELS) as QuestionType[];
-const OPTION_TYPES: QuestionType[] = ['MCQ', 'MULTIPLE_SELECT', 'TRUE_FALSE'];
-const CODE_TYPES: QuestionType[] = ['CODING', 'CODE_COMPLETION', 'CODE_DEBUGGING', 'CODE_OUTPUT_PREDICTION'];
 
 export default function QuestionBankPage() {
   const [items, setItems] = useState<Question[]>([]);
@@ -111,226 +105,18 @@ export default function QuestionBankPage() {
         )}
       </Card>
 
-      <QuestionModal open={modalOpen} onClose={() => setModalOpen(false)} subjects={subjects} onCreated={load} />
+      <QuestionFormModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Add Question"
+        subjects={subjects}
+        onSubmit={async (payload) => {
+          await api.post('/questions', payload);
+          load();
+        }}
+      />
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} subjects={subjects} onImported={load} />
     </div>
-  );
-}
-
-function QuestionModal({
-  open,
-  onClose,
-  subjects,
-  onCreated,
-}: {
-  open: boolean;
-  onClose: () => void;
-  subjects: Subject[];
-  onCreated: () => void;
-}) {
-  const [type, setType] = useState<QuestionType>('MCQ');
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    subjectId: '',
-    topic: '',
-    difficulty: 'MEDIUM',
-    marks: '1',
-    negativeMarks: '0',
-    explanation: '',
-    starterCode: '',
-    incorrectCode: '',
-    expectedOutput: '',
-    sampleInput: '',
-    sampleOutput: '',
-    constraints: '',
-    shortAnswerKey: '',
-  });
-  const [options, setOptions] = useState<Option[]>([
-    { text: '', isCorrect: false },
-    { text: '', isCorrect: false },
-  ]);
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const updateOption = (i: number, patch: Partial<Option>) =>
-    setOptions((prev) => prev.map((o, idx) => (idx === i ? { ...o, ...patch } : o)));
-
-  const submit = async () => {
-    setSaving(true);
-    setError('');
-    try {
-      await api.post('/questions', {
-        title: form.title,
-        description: form.description,
-        type,
-        subjectId: form.subjectId,
-        topic: form.topic,
-        difficulty: form.difficulty,
-        marks: Number(form.marks),
-        negativeMarks: Number(form.negativeMarks),
-        explanation: form.explanation || undefined,
-        options: OPTION_TYPES.includes(type) ? options.filter((o) => o.text.trim()) : undefined,
-        starterCode: form.starterCode || undefined,
-        incorrectCode: form.incorrectCode || undefined,
-        expectedOutput: form.expectedOutput || undefined,
-        sampleInput: form.sampleInput || undefined,
-        sampleOutput: form.sampleOutput || undefined,
-        constraints: form.constraints || undefined,
-        shortAnswerKey: form.shortAnswerKey || undefined,
-      });
-      onCreated();
-      onClose();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Failed to create question');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal open={open} onClose={onClose} title="Add Question" wide>
-      <div className="space-y-3">
-        {error && <ErrorBanner message={error} />}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label>Question Type</Label>
-            <Select value={type} onChange={(e) => setType(e.target.value as QuestionType)}>
-              {QUESTION_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {QUESTION_TYPE_LABELS[t]}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <Label>Subject</Label>
-            <Select value={form.subjectId} onChange={(e) => setForm({ ...form, subjectId: e.target.value })}>
-              <option value="">Select subject</option>
-              {subjects.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-        </div>
-
-        <div>
-          <Label>Title</Label>
-          <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-        </div>
-        <div>
-          <Label>Question Description</Label>
-          <Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-        </div>
-
-        <div className="grid grid-cols-4 gap-3">
-          <div>
-            <Label>Topic</Label>
-            <Input value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} />
-          </div>
-          <div>
-            <Label>Difficulty</Label>
-            <Select value={form.difficulty} onChange={(e) => setForm({ ...form, difficulty: e.target.value })}>
-              <option value="EASY">Easy</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="HARD">Hard</option>
-            </Select>
-          </div>
-          <div>
-            <Label>Marks</Label>
-            <Input type="number" value={form.marks} onChange={(e) => setForm({ ...form, marks: e.target.value })} />
-          </div>
-          <div>
-            <Label>Negative Marks</Label>
-            <Input type="number" value={form.negativeMarks} onChange={(e) => setForm({ ...form, negativeMarks: e.target.value })} />
-          </div>
-        </div>
-
-        {OPTION_TYPES.includes(type) && (
-          <div>
-            <Label>Options (mark the correct one{type === 'MULTIPLE_SELECT' ? 's' : ''})</Label>
-            <div className="space-y-2">
-              {options.map((o, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input
-                    type={type === 'MULTIPLE_SELECT' ? 'checkbox' : 'radio'}
-                    name="correct-option"
-                    checked={o.isCorrect}
-                    onChange={(e) =>
-                      type === 'MULTIPLE_SELECT'
-                        ? updateOption(i, { isCorrect: e.target.checked })
-                        : setOptions((prev) => prev.map((opt, idx) => ({ ...opt, isCorrect: idx === i })))
-                    }
-                  />
-                  <Input value={o.text} onChange={(e) => updateOption(i, { text: e.target.value })} placeholder={`Option ${i + 1}`} />
-                </div>
-              ))}
-              <button className="text-xs text-[var(--accent)] hover:underline" onClick={() => setOptions([...options, { text: '', isCorrect: false }])}>
-                + Add option
-              </button>
-            </div>
-          </div>
-        )}
-
-        {type === 'SHORT_ANSWER' && (
-          <div>
-            <Label>Expected Answer</Label>
-            <Input value={form.shortAnswerKey} onChange={(e) => setForm({ ...form, shortAnswerKey: e.target.value })} />
-          </div>
-        )}
-
-        {type === 'CODE_DEBUGGING' && (
-          <div>
-            <Label>Incorrect Code (for the student to fix)</Label>
-            <Textarea rows={4} className="font-mono" value={form.incorrectCode} onChange={(e) => setForm({ ...form, incorrectCode: e.target.value })} />
-          </div>
-        )}
-
-        {(type === 'CODING' || type === 'CODE_COMPLETION') && (
-          <div>
-            <Label>Starter Code</Label>
-            <Textarea rows={4} className="font-mono" value={form.starterCode} onChange={(e) => setForm({ ...form, starterCode: e.target.value })} />
-          </div>
-        )}
-
-        {type === 'CODE_OUTPUT_PREDICTION' && (
-          <>
-            <div>
-              <Label>Code Snippet</Label>
-              <Textarea rows={4} className="font-mono" value={form.starterCode} onChange={(e) => setForm({ ...form, starterCode: e.target.value })} />
-            </div>
-            <div>
-              <Label>Expected Output</Label>
-              <Input value={form.expectedOutput} onChange={(e) => setForm({ ...form, expectedOutput: e.target.value })} />
-            </div>
-          </>
-        )}
-
-        {CODE_TYPES.includes(type) && type !== 'CODE_OUTPUT_PREDICTION' && (
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Sample Input</Label>
-              <Textarea rows={2} value={form.sampleInput} onChange={(e) => setForm({ ...form, sampleInput: e.target.value })} />
-            </div>
-            <div>
-              <Label>Sample Output</Label>
-              <Textarea rows={2} value={form.sampleOutput} onChange={(e) => setForm({ ...form, sampleOutput: e.target.value })} />
-            </div>
-          </div>
-        )}
-
-        <div>
-          <Label>Explanation (shown after evaluation, optional)</Label>
-          <Textarea rows={2} value={form.explanation} onChange={(e) => setForm({ ...form, explanation: e.target.value })} />
-        </div>
-
-        <Button className="w-full" loading={saving} onClick={submit}>
-          Save Question
-        </Button>
-      </div>
-    </Modal>
   );
 }
 

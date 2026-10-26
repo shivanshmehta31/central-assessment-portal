@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { CreateQuestionDto, QuestionQueryDto, UpdateQuestionDto } from './dto/question.dto';
@@ -49,7 +49,21 @@ export class QuestionsService {
     return question;
   }
 
+  // Choice questions must carry a usable answer key, otherwise they can never be graded.
+  private assertValidOptions(dto: CreateQuestionDto) {
+    if (!['MCQ', 'MULTIPLE_SELECT', 'TRUE_FALSE'].includes(dto.type)) return;
+    const options = (dto.options ?? []).filter((o) => o.text?.trim());
+    const correct = options.filter((o) => o.isCorrect).length;
+    if (options.length < 2) throw new BadRequestException('Add at least two options');
+    if (dto.type === 'MULTIPLE_SELECT' ? correct < 1 : correct !== 1) {
+      throw new BadRequestException(
+        dto.type === 'MULTIPLE_SELECT' ? 'Mark at least one correct option' : 'Mark exactly one correct option',
+      );
+    }
+  }
+
   async create(dto: CreateQuestionDto, facultyId: string | undefined, actorId: string) {
+    this.assertValidOptions(dto);
     const question = await this.prisma.question.create({
       data: {
         title: dto.title,
@@ -101,6 +115,7 @@ export class QuestionsService {
 
   async update(id: string, dto: UpdateQuestionDto, actorId: string) {
     await this.get(id);
+    this.assertValidOptions(dto);
 
     await this.prisma.$transaction([
       this.prisma.questionOption.deleteMany({ where: { questionId: id } }),

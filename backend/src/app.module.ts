@@ -20,6 +20,8 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { SettingsModule } from './settings/settings.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { HealthController } from './health.controller';
+import { FilesModule } from './files/files.module';
+import { QuestionPapersModule } from './question-papers/question-papers.module';
 
 @Module({
   controllers: [HealthController],
@@ -43,6 +45,8 @@ import { HealthController } from './health.controller';
     AuditLogsModule,
     NotificationsModule,
     SettingsModule,
+    FilesModule,
+    QuestionPapersModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

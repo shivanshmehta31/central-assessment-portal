@@ -65,6 +65,11 @@ enum AssessmentStatus {
   ARCHIVED
 }
 
+enum AssessmentMode {
+  ONLINE
+  OFFLINE // paper-based: question paper + scanned/uploaded answer sheets, evaluated by faculty
+}
+
 enum DeviceRestriction {
   DESKTOP_ONLY
   DESKTOP_AND_TABLET
@@ -149,21 +154,21 @@ enum NotificationType {
 // ────────────────────────────────────────────────────────────────────────────
 
 model User {
-  id            String        @id @default(cuid())
-  email         String        @unique
-  passwordHash  String
-  role          UserRole
-  status        AccountStatus @default(ACTIVE)
-  mustResetPassword Boolean   @default(false)
+  id                     String        @id @default(cuid())
+  email                  String        @unique
+  passwordHash           String
+  role                   UserRole
+  status                 AccountStatus @default(ACTIVE)
+  mustResetPassword      Boolean       @default(false)
   passwordResetTokenHash String?
   passwordResetExpiresAt DateTime?
-  lastLoginAt   DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  lastLoginAt            DateTime?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
 
-  admin    Admin?
-  faculty  Faculty?
-  student  Student?
+  admin   Admin?
+  faculty Faculty?
+  student Student?
 
   auditLogs     AuditLog[]
   notifications Notification[]
@@ -186,10 +191,10 @@ model RefreshToken {
 }
 
 model Admin {
-  id       String @id @default(cuid())
-  userId   String @unique
-  name     String
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String @unique
+  name   String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 }
@@ -219,38 +224,38 @@ model Course {
 }
 
 model Subject {
-  id        String   @id @default(cuid())
-  name      String
-  code      String   @unique
-  courseId  String
+  id            String   @id @default(cuid())
+  name          String
+  code          String   @unique
+  courseId      String
   syllabusUnits Json? // structured syllabus units/topics/subtopics
-  createdAt DateTime @default(now())
+  createdAt     DateTime @default(now())
 
-  course        Course         @relation(fields: [courseId], references: [id])
-  questions     Question[]
-  assessments   Assessment[]
+  course          Course           @relation(fields: [courseId], references: [id])
+  questions       Question[]
+  assessments     Assessment[]
   facultySubjects FacultySubject[]
 
   @@index([courseId])
 }
 
 model Faculty {
-  id             String   @id @default(cuid())
-  userId         String   @unique
-  facultyCode    String   @unique
-  name           String
-  phone          String?
-  departmentId   String
-  designation    String?
-  createdAt      DateTime @default(now())
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  facultyCode  String   @unique
+  name         String
+  phone        String?
+  departmentId String
+  designation  String?
+  createdAt    DateTime @default(now())
 
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   department Department @relation(fields: [departmentId], references: [id])
 
-  facultySubjects   FacultySubject[]
+  facultySubjects     FacultySubject[]
   assignedAssessments AssessmentEvaluator[]
-  createdQuestions  Question[] @relation("QuestionCreatedBy")
-  scoreOverrides    EvaluationResult[]
+  createdQuestions    Question[]            @relation("QuestionCreatedBy")
+  scoreOverrides      EvaluationResult[]
 
   @@index([departmentId])
 }
@@ -297,50 +302,50 @@ model Student {
 // ────────────────────────────────────────────────────────────────────────────
 
 model Question {
-  id              String          @id @default(cuid())
-  title           String
-  description     String // question body, supports markdown/code blocks
-  type            QuestionType
-  difficulty      DifficultyLevel @default(MEDIUM)
-  subjectId       String
-  topic           String
-  subtopic        String?
-  marks           Float           @default(1)
-  negativeMarks   Float           @default(0)
-  tags            String[]        @default([])
-  explanation     String?
-  imageUrl        String?
-  isActive        Boolean         @default(true)
+  id            String          @id @default(cuid())
+  title         String
+  description   String // question body, supports markdown/code blocks
+  type          QuestionType
+  difficulty    DifficultyLevel @default(MEDIUM)
+  subjectId     String
+  topic         String
+  subtopic      String?
+  marks         Float           @default(1)
+  negativeMarks Float           @default(0)
+  tags          String[]        @default([])
+  explanation   String?
+  imageUrl      String?
+  isActive      Boolean         @default(true)
 
   // MCQ / Multi-select / True-False
-  options         QuestionOption[]
+  options QuestionOption[]
 
   // Short answer
-  shortAnswerKey  String?
-  characterLimit  Int?
+  shortAnswerKey String?
+  characterLimit Int?
 
   // Descriptive
-  wordLimit       Int?
+  wordLimit Int?
 
   // Coding / Completion / Debugging / Output prediction
-  starterCode     String?
-  language        String?         @default("python")
-  incorrectCode   String?         // for debugging questions
-  expectedOutput  String?         // for output prediction
-  constraints     String?
-  sampleInput     String?
-  sampleOutput    String?
-  testCases       TestCase[]
+  starterCode    String?
+  language       String?    @default("python")
+  incorrectCode  String? // for debugging questions
+  expectedOutput String? // for output prediction
+  constraints    String?
+  sampleInput    String?
+  sampleOutput   String?
+  testCases      TestCase[]
 
   // Dataset-based
-  datasetId       String?
-  dataset         Dataset?        @relation(fields: [datasetId], references: [id])
-  allowedLibraries String[]       @default([])
-  allowDatasetDownload Boolean    @default(false)
+  datasetId            String?
+  dataset              Dataset? @relation(fields: [datasetId], references: [id])
+  allowedLibraries     String[] @default([])
+  allowDatasetDownload Boolean  @default(false)
 
-  createdById     String?
-  createdBy       Faculty?        @relation("QuestionCreatedBy", fields: [createdById], references: [id])
-  subject         Subject         @relation(fields: [subjectId], references: [id])
+  createdById String?
+  createdBy   Faculty? @relation("QuestionCreatedBy", fields: [createdById], references: [id])
+  subject     Subject  @relation(fields: [subjectId], references: [id])
 
   assessmentQuestions AssessmentQuestion[]
   studentAnswers      StudentAnswer[]
@@ -395,38 +400,43 @@ model Dataset {
 // ────────────────────────────────────────────────────────────────────────────
 
 model Assessment {
-  id            String           @id @default(cuid())
-  title         String
-  description   String?
-  subjectId     String
-  type          AssessmentType
-  status        AssessmentStatus @default(DRAFT)
+  id          String           @id @default(cuid())
+  title       String
+  description String?
+  subjectId   String
+  type        AssessmentType
+  status      AssessmentStatus @default(DRAFT)
+  mode        AssessmentMode   @default(ONLINE)
 
-  totalMarks    Float
-  passingMarks  Float
+  // Paper-based assessments: the uploaded question paper document (pdf / csv / xlsx)
+  questionPaperFileId String?
+  questionPaperFile   StoredFile? @relation("QuestionPaperFile", fields: [questionPaperFileId], references: [id], onDelete: SetNull)
+
+  totalMarks      Float
+  passingMarks    Float
   durationMinutes Int
 
-  startAt       DateTime
-  endAt         DateTime
+  startAt DateTime
+  endAt   DateTime
 
-  maxAttempts   Int              @default(1)
-  allowResume   Boolean          @default(true)
+  maxAttempts Int     @default(1)
+  allowResume Boolean @default(true)
 
   randomizeQuestionOrder Boolean @default(false)
   randomizeOptionOrder   Boolean @default(false)
-  questionsPerAttempt    Int?    // if set, draw a random subset from the pool
+  questionsPerAttempt    Int? // if set, draw a random subset from the pool
 
   deviceRestriction DeviceRestriction @default(DESKTOP_AND_TABLET)
-  requireFullscreen Boolean @default(true)
+  requireFullscreen Boolean           @default(true)
 
-  violationLimit    Int                    @default(3)
-  violationAction   ViolationPolicyAction  @default(AUTO_SUBMIT)
+  violationLimit  Int                   @default(3)
+  violationAction ViolationPolicyAction @default(AUTO_SUBMIT)
 
   showResultsImmediately Boolean @default(false)
   showCorrectAnswers     Boolean @default(false)
 
-  semester    String?
-  batch       String?
+  semester String?
+  batch    String?
 
   createdById String
   createdAt   DateTime @default(now())
@@ -444,10 +454,10 @@ model Assessment {
 }
 
 model AssessmentQuestion {
-  id           String @id @default(cuid())
-  assessmentId String
-  questionId   String
-  order        Int    @default(0)
+  id            String @id @default(cuid())
+  assessmentId  String
+  questionId    String
+  order         Int    @default(0)
   marksOverride Float?
 
   assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
@@ -493,24 +503,28 @@ model AttemptRecord {
   status        AttemptStatus @default(NOT_STARTED)
 
   // server-authoritative timing
-  startedAt     DateTime?
-  deadlineAt    DateTime?     // startedAt + duration + extensions
-  extraTimeSeconds Int        @default(0)
-  submittedAt   DateTime?
+  startedAt        DateTime?
+  deadlineAt       DateTime? // startedAt + duration + extensions
+  extraTimeSeconds Int               @default(0)
+  submittedAt      DateTime?
   submissionReason SubmissionReason?
 
   // question set actually served to this student (order + subset), for randomization
-  questionOrder String[]      @default([])
+  questionOrder String[] @default([])
 
-  violationCount Int          @default(0)
-  currentQuestionIndex Int    @default(0)
+  violationCount       Int @default(0)
+  currentQuestionIndex Int @default(0)
 
-  autoScore     Float?
-  manualScore   Float?
-  finalScore    Float?
-  resultStatus  ResultStatus  @default(PENDING_EVALUATION)
+  autoScore    Float?
+  manualScore  Float?
+  finalScore   Float?
+  resultStatus ResultStatus @default(PENDING_EVALUATION)
 
   lastActivityAt DateTime?
+
+  // Paper-based assessments: the uploaded answer sheet (pdf / image) for this student
+  answerSheetFileId String?
+  answerSheetFile   StoredFile? @relation("AnswerSheetFile", fields: [answerSheetFileId], references: [id], onDelete: SetNull)
 
   assessment Assessment      @relation(fields: [assessmentId], references: [id])
   student    Student         @relation(fields: [studentId], references: [id])
@@ -526,7 +540,7 @@ model AttemptRecord {
 }
 
 model StudentAnswer {
-  id         String   @id @default(cuid())
+  id         String @id @default(cuid())
   attemptId  String
   questionId String
 
@@ -536,12 +550,12 @@ model StudentAnswer {
   codeAnswer        String?
   codeLanguage      String?  @default("python")
 
-  isMarkedForReview Boolean  @default(false)
-  isAnswered        Boolean  @default(false)
-  timeSpentSeconds  Int      @default(0)
+  isMarkedForReview Boolean @default(false)
+  isAnswered        Boolean @default(false)
+  timeSpentSeconds  Int     @default(0)
 
   // evaluation
-  isAutoEvaluated Boolean  @default(false)
+  isAutoEvaluated Boolean   @default(false)
   autoScore       Float?
   autoCorrect     Boolean?
   manualScore     Float?
@@ -580,17 +594,17 @@ model EvaluationResult {
 // ────────────────────────────────────────────────────────────────────────────
 
 model Violation {
-  id           String                   @id @default(cuid())
-  attemptId    String
-  studentId    String
-  type         ViolationType
-  timestamp    DateTime                 @default(now())
-  questionIndexAtTime Int?
+  id                   String                  @id @default(cuid())
+  attemptId            String
+  studentId            String
+  type                 ViolationType
+  timestamp            DateTime                @default(now())
+  questionIndexAtTime  Int?
   remainingTimeSeconds Int?
-  actionTaken  ViolationSeverityAction  @default(WARNED)
-  metadata     Json?
+  actionTaken          ViolationSeverityAction @default(WARNED)
+  metadata             Json?
 
-  overridden     Boolean  @default(false)
+  overridden     Boolean   @default(false)
   overriddenById String?
   overriddenAt   DateTime?
   overrideNote   String?
@@ -608,16 +622,16 @@ model Violation {
 // ────────────────────────────────────────────────────────────────────────────
 
 model AuditLog {
-  id           String   @id @default(cuid())
-  userId       String?
-  role         UserRole?
-  action       String
-  entityType   String?
-  entityId     String?
-  metadata     Json?
-  ipAddress    String?
-  userAgent    String?
-  timestamp    DateTime @default(now())
+  id         String    @id @default(cuid())
+  userId     String?
+  role       UserRole?
+  action     String
+  entityType String?
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  timestamp  DateTime  @default(now())
 
   user User? @relation(fields: [userId], references: [id])
 
@@ -644,15 +658,31 @@ model Notification {
 }
 
 model SystemSetting {
-  id                       String   @id @default("singleton")
-  institutionName          String   @default("Central Assessment & Examination Portal")
-  institutionLogoUrl       String?
-  academicYear             String   @default("2026-2027")
-  defaultExamDurationMinutes Int    @default(60)
-  defaultViolationLimit     Int     @default(3)
-  defaultViolationAction    ViolationPolicyAction @default(AUTO_SUBMIT)
-  passwordMinLength         Int     @default(8)
-  sessionDurationMinutes    Int     @default(60)
-  supportedFileTypes        String[] @default(["csv", "xlsx", "json", "pdf", "png", "jpg"])
-  updatedAt                 DateTime @updatedAt
+  id                         String                @id @default("singleton")
+  institutionName            String                @default("Central Assessment & Examination Portal")
+  institutionLogoUrl         String?
+  academicYear               String                @default("2026-2027")
+  defaultExamDurationMinutes Int                   @default(60)
+  defaultViolationLimit      Int                   @default(3)
+  defaultViolationAction     ViolationPolicyAction @default(AUTO_SUBMIT)
+  passwordMinLength          Int                   @default(8)
+  sessionDurationMinutes     Int                   @default(60)
+  supportedFileTypes         String[]              @default(["csv", "xlsx", "json", "pdf", "png", "jpg"])
+  updatedAt                  DateTime              @updatedAt
+}
+
+// Uploaded documents (question papers, answer sheets). Stored in Postgres so they
+// survive on hosts with ephemeral disks (e.g. free-tier PaaS); swap for object
+// storage when volumes grow.
+model StoredFile {
+  id           String   @id @default(cuid())
+  filename     String
+  mimeType     String
+  size         Int
+  data         Bytes
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  questionPapers Assessment[]    @relation("QuestionPaperFile")
+  answerSheets   AttemptRecord[] @relation("AnswerSheetFile")
 }

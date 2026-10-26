@@ -30,6 +30,7 @@ interface Assessment {
   id: string;
   title: string;
   status: string;
+  mode: string;
   subjectId: string;
   totalMarks: number;
   durationMinutes: number;
@@ -109,9 +110,16 @@ export default function AssessmentDetailPage() {
         </div>
       </div>
 
+      {assessment.mode === 'OFFLINE' && (
+        <ErrorBanner
+          tone="info"
+          message="This is a paper-based assessment. Its question paper and answer sheets are managed by faculty (Faculty portal → Question Papers). Publish results from the Results page once evaluation is complete."
+        />
+      )}
       {actionMsg && <ErrorBanner message={actionMsg} tone="success" />}
       {error && <ErrorBanner message={error} />}
 
+      {assessment.mode !== 'OFFLINE' && (
       <Card>
         <h2 className="mb-3 text-sm font-semibold">Exam Control</h2>
         <div className="flex flex-wrap gap-2">
@@ -147,10 +155,15 @@ export default function AssessmentDetailPage() {
           </Button>
         </div>
       </Card>
+      )}
 
-      <QuestionAttachment assessment={assessment} onUpdated={load} />
-      <StudentAssignment assessment={assessment} onUpdated={load} />
-      <EvaluatorAssignment assessment={assessment} onUpdated={load} />
+      {assessment.mode !== 'OFFLINE' && (
+        <>
+          <QuestionAttachment assessment={assessment} onUpdated={load} />
+          <StudentAssignment assessment={assessment} onUpdated={load} />
+          <EvaluatorAssignment assessment={assessment} onUpdated={load} />
+        </>
+      )}
     </div>
   );
 }
