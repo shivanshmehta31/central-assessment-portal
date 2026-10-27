@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsNotEmpty,
   IsBoolean,
   IsEmail,
   IsIn,
@@ -9,12 +10,12 @@ import {
 } from 'class-validator';
 
 export class CreateStudentDto {
-  @IsString() name!: string;
-  @IsEmail() email!: string;
-  @IsString() studentCode!: string;
-  @IsString() enrollmentNumber!: string;
+  @IsString() @IsNotEmpty({ message: 'Name is required' }) name!: string;
+  @IsEmail({}, { message: 'Enter a valid email address' }) email!: string;
+  @IsString() @IsNotEmpty({ message: 'Student ID is required' }) studentCode!: string;
+  @IsString() @IsNotEmpty({ message: 'Enrollment number is required' }) enrollmentNumber!: string;
   @IsOptional() @IsString() phone?: string;
-  @IsString() departmentId!: string;
+  @IsString() @IsNotEmpty({ message: 'Department is required' }) departmentId!: string;
   @IsOptional() @IsString() branch?: string;
   @IsOptional() @Type(() => Number) @IsInt() semester?: number;
   @IsOptional() @IsString() section?: string;

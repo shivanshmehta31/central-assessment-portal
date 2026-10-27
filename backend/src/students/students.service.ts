@@ -71,27 +71,32 @@ export class StudentsService {
     const password = dto.password ?? generateTempPassword();
     const passwordHash = await AuthService.hashPassword(password);
 
+    const dept = await this.prisma.department.findUnique({ where: { id: dto.departmentId } });
+    if (!dept) throw new BadRequestException('Selected department does not exist');
+
+    // A nested user create requires the relation form (department: connect) — mixing it with
+    // the raw departmentId scalar is rejected by Prisma at runtime.
     const student = await this.prisma.student.create({
       data: {
-        studentCode: dto.studentCode,
-        enrollmentNumber: dto.enrollmentNumber,
-        name: dto.name,
-        phone: dto.phone,
-        departmentId: dto.departmentId,
-        branch: dto.branch,
+        studentCode: dto.studentCode.trim(),
+        enrollmentNumber: dto.enrollmentNumber.trim(),
+        name: dto.name.trim(),
+        phone: dto.phone || undefined,
+        branch: dto.branch || undefined,
         semester: dto.semester,
-        section: dto.section,
-        batch: dto.batch,
-        academicYear: dto.academicYear,
+        section: dto.section || undefined,
+        batch: dto.batch || undefined,
+        academicYear: dto.academicYear || undefined,
+        department: { connect: { id: dto.departmentId } },
         user: {
           create: {
             email: dto.email.toLowerCase(),
             passwordHash,
-            role: 'STUDENT' as const,
+            role: 'STUDENT',
             mustResetPassword: true,
           },
         },
-      } as any,
+      },
       include: { user: true },
     });
 
@@ -178,16 +183,16 @@ export class StudentsService {
     const updated = await this.prisma.student.update({
       where: { id },
       data: {
-        name: dto.name,
+        name: dto.name?.trim(),
         phone: dto.phone,
-        departmentId: dto.departmentId,
         branch: dto.branch,
         semester: dto.semester,
         section: dto.section,
         batch: dto.batch,
         academicYear: dto.academicYear,
+        department: dto.departmentId ? { connect: { id: dto.departmentId } } : undefined,
         user: dto.email ? { update: { email: dto.email.toLowerCase() } } : undefined,
-      } as any,
+      },
       include: { user: true },
     });
 

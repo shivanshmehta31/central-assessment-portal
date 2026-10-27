@@ -1,11 +1,11 @@
-import { IsArray, IsEmail, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateFacultyDto {
-  @IsString() name!: string;
-  @IsEmail() email!: string;
-  @IsString() facultyCode!: string;
+  @IsString() @IsNotEmpty({ message: 'Name is required' }) name!: string;
+  @IsEmail({}, { message: 'Enter a valid email address' }) email!: string;
+  @IsString() @IsNotEmpty({ message: 'Faculty ID is required' }) facultyCode!: string;
   @IsOptional() @IsString() phone?: string;
-  @IsString() departmentId!: string;
+  @IsString() @IsNotEmpty({ message: 'Department is required' }) departmentId!: string;
   @IsOptional() @IsString() designation?: string;
   @IsOptional() @IsArray() subjectIds?: string[];
 }

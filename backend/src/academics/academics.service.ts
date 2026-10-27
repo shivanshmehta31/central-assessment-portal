@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -69,15 +69,50 @@ export class AcademicsService {
     });
   }
 
-  createSubject(data: { name: string; code: string; courseId: string; syllabusUnits?: unknown }) {
-    return this.prisma.subject.create({ data: data as any });
+  // "Cloud Computing" -> CC, "Operating System" -> OS, "Maths" -> MATHS (suffix added if taken)
+  private async uniqueSubjectCode(name: string) {
+    const words = name.trim().split(/\s+/).filter(Boolean);
+    const raw = words.length > 1 ? words.map((w) => w[0]).join('') : (words[0] ?? '').slice(0, 5);
+    const base = raw.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'SUBJ';
+    let code = base;
+    let n = 1;
+    while (await this.prisma.subject.findUnique({ where: { code } })) code = `${base}${++n}`;
+    return code;
   }
 
-  async updateSubject(id: string, data: Partial<{ name: string; code: string; syllabusUnits: unknown }>) {
-    return this.prisma.subject.update({ where: { id }, data: data as any });
+  async createSubject(data: { name: string; code?: string; courseId: string; syllabusUnits?: unknown }) {
+    const course = await this.prisma.course.findUnique({ where: { id: data.courseId } });
+    if (!course) throw new BadRequestException('Selected course does not exist');
+
+    const name = data.name.trim();
+    const duplicate = await this.prisma.subject.findFirst({
+      where: { courseId: data.courseId, name: { equals: name, mode: 'insensitive' } },
+    });
+    if (duplicate) throw new BadRequestException(`"${duplicate.name}" already exists in this course`);
+
+    const code = data.code?.trim() ? data.code.trim().toUpperCase() : await this.uniqueSubjectCode(name);
+    return this.prisma.subject.create({ data: { ...data, name, code } as any });
+  }
+
+  async updateSubject(id: string, data: { name?: string; code?: string; syllabusUnits?: unknown }) {
+    await this.getSubject(id);
+    return this.prisma.subject.update({
+      where: { id },
+      data: { ...data, name: data.name?.trim(), code: data.code?.trim().toUpperCase() } as any,
+    });
   }
 
   async deleteSubject(id: string) {
+    const subject = await this.getSubject(id);
+    const [questions, assessments] = await Promise.all([
+      this.prisma.question.count({ where: { subjectId: id } }),
+      this.prisma.assessment.count({ where: { subjectId: id } }),
+    ]);
+    if (questions || assessments) {
+      throw new BadRequestException(
+        `"${subject.name}" has ${questions} question(s) and ${assessments} assessment(s), so it can't be deleted.`,
+      );
+    }
     await this.prisma.subject.delete({ where: { id } });
     return { success: true };
   }

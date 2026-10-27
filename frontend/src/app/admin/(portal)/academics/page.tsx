@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { api, ApiError } from '@/lib/api';
 import { Button, Card, EmptyState, ErrorBanner, Input, Label, LoadingBlock, Modal, Select } from '@/components/ui/primitives';
+import { SubjectModal, type SubjectRow } from '@/components/academics/subject-modal';
 
 interface Department {
   id: string;
@@ -36,6 +37,9 @@ export default function AcademicsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [subjectModalOpen, setSubjectModalOpen] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<SubjectRow | null>(null);
+  const [message, setMessage] = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -57,6 +61,19 @@ export default function AcademicsPage() {
     load();
   }, [load]);
 
+  const deleteSubject = async (s: Subject) => {
+    if (!confirm(`Delete the subject "${s.name}"?`)) return;
+    setError('');
+    setMessage('');
+    try {
+      await api.delete(`/subjects/${s.id}`);
+      setMessage(`Deleted "${s.name}".`);
+      load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not delete the subject');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -64,7 +81,7 @@ export default function AcademicsPage() {
           <h1 className="text-xl font-semibold">Academics</h1>
           <p className="text-sm text-muted">Departments, courses, and subjects.</p>
         </div>
-        <Button onClick={() => setModalOpen(true)}>
+        <Button onClick={() => (tab === 'subjects' ? setSubjectModalOpen(true) : setModalOpen(true))}>
           <Plus size={15} /> Add {tab === 'departments' ? 'Department' : tab === 'courses' ? 'Course' : 'Subject'}
         </Button>
       </div>
@@ -80,6 +97,8 @@ export default function AcademicsPage() {
           </button>
         ))}
       </div>
+
+      {message && <ErrorBanner message={message} tone="success" />}
 
       <Card>
         {loading && <LoadingBlock />}
@@ -113,11 +132,36 @@ export default function AcademicsPage() {
               { header: 'Name', render: (s: Subject) => s.name },
               { header: 'Code', render: (s: Subject) => s.code },
               { header: 'Course', render: (s: Subject) => s.course?.name },
+              {
+                header: 'Actions',
+                render: (s: Subject) => (
+                  <span className="flex gap-3 text-xs">
+                    <button className="text-[var(--accent)] hover:underline" onClick={() => setEditingSubject(s)}>
+                      Edit
+                    </button>
+                    <button className="text-[var(--danger)] hover:underline" onClick={() => deleteSubject(s)}>
+                      Delete
+                    </button>
+                  </span>
+                ),
+              },
             ]}
           />
         )}
       </Card>
 
+      <SubjectModal
+        open={subjectModalOpen || !!editingSubject}
+        subject={editingSubject}
+        onClose={() => {
+          setSubjectModalOpen(false);
+          setEditingSubject(null);
+        }}
+        onSaved={(sub) => {
+          setMessage(`Saved "${sub.name}".`);
+          load();
+        }}
+      />
       <AcademicsModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}

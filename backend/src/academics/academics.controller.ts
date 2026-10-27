@@ -3,7 +3,14 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { AcademicsService } from './academics.service';
-import { CreateCourseDto, CreateDepartmentDto, CreateSubjectDto } from './dto/academics.dto';
+import {
+  CreateCourseDto,
+  CreateDepartmentDto,
+  CreateSubjectDto,
+  UpdateCourseDto,
+  UpdateDepartmentDto,
+  UpdateSubjectDto,
+} from './dto/academics.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller()
@@ -23,7 +30,7 @@ export class AcademicsController {
 
   @Roles('ADMIN')
   @Patch('departments/:id')
-  updateDepartment(@Param('id') id: string, @Body() dto: Partial<CreateDepartmentDto>) {
+  updateDepartment(@Param('id') id: string, @Body() dto: UpdateDepartmentDto) {
     return this.academics.updateDepartment(id, dto);
   }
 
@@ -46,7 +53,7 @@ export class AcademicsController {
 
   @Roles('ADMIN')
   @Patch('courses/:id')
-  updateCourse(@Param('id') id: string, @Body() dto: Partial<CreateCourseDto>) {
+  updateCourse(@Param('id') id: string, @Body() dto: UpdateCourseDto) {
     return this.academics.updateCourse(id, dto);
   }
 
@@ -74,7 +81,7 @@ export class AcademicsController {
 
   @Roles('ADMIN')
   @Patch('subjects/:id')
-  updateSubject(@Param('id') id: string, @Body() dto: Partial<CreateSubjectDto>) {
+  updateSubject(@Param('id') id: string, @Body() dto: UpdateSubjectDto) {
     return this.academics.updateSubject(id, dto);
   }
 

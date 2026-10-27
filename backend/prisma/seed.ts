@@ -77,6 +77,20 @@ async function main() {
     },
   });
 
+  // Other subjects offered in the course (no questions yet — faculty/admins add those).
+  for (const extra of [
+    { name: 'Operating System', code: 'OS' },
+    { name: 'DSA', code: 'DSA' },
+    { name: 'Cloud Computing', code: 'CC' },
+    { name: 'Maths', code: 'MATHS' },
+  ]) {
+    await prisma.subject.upsert({
+      where: { code: extra.code },
+      update: {},
+      create: { ...extra, courseId: course.id },
+    });
+  }
+
   // ── Admin ──────────────────────────────────────────────────────────────
   const adminUser = await prisma.user.upsert({
     where: { email: ADMIN_EMAIL },

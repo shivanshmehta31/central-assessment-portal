@@ -46,6 +46,11 @@ export class FacultyService {
     return faculty;
   }
 
+  private async assertDepartment(departmentId: string) {
+    const dept = await this.prisma.department.findUnique({ where: { id: departmentId } });
+    if (!dept) throw new BadRequestException('Selected department does not exist');
+  }
+
   async create(dto: CreateFacultyDto, actorId: string) {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email.toLowerCase() } });
     if (existing) throw new BadRequestException('A user with this email already exists');
@@ -53,20 +58,24 @@ export class FacultyService {
     const password = generateTempPassword();
     const passwordHash = await AuthService.hashPassword(password);
 
+    await this.assertDepartment(dto.departmentId);
+
+    // A nested user create requires the relation form (department: connect) — mixing it with
+    // the raw departmentId scalar is rejected by Prisma at runtime.
     const faculty = await this.prisma.faculty.create({
       data: {
-        name: dto.name,
-        facultyCode: dto.facultyCode,
-        phone: dto.phone,
-        departmentId: dto.departmentId,
-        designation: dto.designation,
+        name: dto.name.trim(),
+        facultyCode: dto.facultyCode.trim(),
+        phone: dto.phone || undefined,
+        designation: dto.designation || undefined,
+        department: { connect: { id: dto.departmentId } },
         user: {
-          create: { email: dto.email.toLowerCase(), passwordHash, role: 'FACULTY' as const, mustResetPassword: true },
+          create: { email: dto.email.toLowerCase(), passwordHash, role: 'FACULTY', mustResetPassword: true },
         },
-        facultySubjects: dto.subjectIds
-          ? { create: dto.subjectIds.map((subjectId) => ({ subjectId })) }
+        facultySubjects: dto.subjectIds?.length
+          ? { create: [...new Set(dto.subjectIds)].map((subjectId) => ({ subject: { connect: { id: subjectId } } })) }
           : undefined,
-      } as any,
+      },
       include: { user: true },
     });
 
@@ -82,16 +91,17 @@ export class FacultyService {
   }
 
   async update(id: string, dto: UpdateFacultyDto, actorId: string) {
-    const faculty = await this.get(id);
+    await this.get(id);
+    if (dto.departmentId) await this.assertDepartment(dto.departmentId);
     const updated = await this.prisma.faculty.update({
       where: { id },
       data: {
-        name: dto.name,
+        name: dto.name?.trim(),
         phone: dto.phone,
-        departmentId: dto.departmentId,
         designation: dto.designation,
+        department: dto.departmentId ? { connect: { id: dto.departmentId } } : undefined,
         user: dto.email ? { update: { email: dto.email.toLowerCase() } } : undefined,
-      } as any,
+      },
     });
     await this.auditLogs.record({ userId: actorId, role: 'ADMIN', action: 'FACULTY_UPDATED', entityType: 'Faculty', entityId: id });
     return updated;
